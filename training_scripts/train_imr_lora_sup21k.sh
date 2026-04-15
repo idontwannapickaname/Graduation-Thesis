@@ -7,12 +7,34 @@ fi
 
 DATA_PATH="${DATA_PATH:-./datasets}"
 
-if [ ! -f "$DATA_PATH/imagenet-r.tar" ]; then
-        echo "Error: missing $DATA_PATH/imagenet-r.tar"
-        echo "Set DATA_PATH to your dataset directory, e.g.:"
-        echo "  DATA_PATH=/kaggle/input/<your-dataset-dir> bash training_scripts/train_imr_lora_sup21k.sh"
-        exit 1
+# Accept common layouts:
+# 1) DATA_PATH contains imagenet-r/ (already extracted)
+# 2) DATA_PATH points directly to imagenet-r/
+# 3) DATA_PATH contains imagenet-r.tar or imagenet-r.tar.gz
+if [ -d "$DATA_PATH" ] && [ "$(basename "$DATA_PATH")" = "imagenet-r" ]; then
+        DATA_PATH="$(dirname "$DATA_PATH")"
 fi
+
+if [ ! -d "$DATA_PATH/imagenet-r" ]; then
+        if [ -f "$DATA_PATH/imagenet-r.tar.gz" ]; then
+                echo "Found $DATA_PATH/imagenet-r.tar.gz, extracting..."
+                tar -xzf "$DATA_PATH/imagenet-r.tar.gz" -C "$DATA_PATH"
+        elif [ -f "$DATA_PATH/imagenet-r.tar" ]; then
+                echo "Found $DATA_PATH/imagenet-r.tar"
+                # continual_datasets/continual_datasets.py handles extraction from this tar.
+        else
+                echo "Error: could not find ImageNet-R data under DATA_PATH=$DATA_PATH"
+                echo "Expected one of:"
+                echo "  1) $DATA_PATH/imagenet-r/"
+                echo "  2) $DATA_PATH/imagenet-r.tar"
+                echo "  3) $DATA_PATH/imagenet-r.tar.gz"
+                echo "You can also set DATA_PATH directly to the imagenet-r folder."
+                echo "Example: DATA_PATH=/kaggle/input/imagenet-r bash training_scripts/train_imr_lora_sup21k.sh"
+                exit 1
+        fi
+fi
+
+echo "Using DATA_PATH=$DATA_PATH"
 
 for seed in 42
 do
