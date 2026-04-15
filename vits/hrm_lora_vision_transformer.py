@@ -1002,16 +1002,11 @@ def _create_vision_transformer(variant, pretrained=False, **kwargs):
         raise RuntimeError('features_only not implemented for Vision Transformer models.')
 
     pretrained_cfg = resolve_pretrained_cfg(variant, pretrained_cfg=kwargs.pop('pretrained_cfg', None))
-    if isinstance(pretrained_cfg, dict):
-        pretrained_cfg_url = pretrained_cfg.get('url', '')
-    else:
-        pretrained_cfg_url = getattr(pretrained_cfg, 'url', '')
-
     model = build_model_with_cfg(
         VisionTransformer, variant, pretrained,
         pretrained_cfg=pretrained_cfg,
         pretrained_filter_fn=checkpoint_filter_fn,
-        pretrained_custom_load=isinstance(pretrained_cfg_url, str) and 'npz' in pretrained_cfg_url,
+        pretrained_custom_load='npz' in pretrained_cfg['url'],
         **kwargs)
     return model
 
