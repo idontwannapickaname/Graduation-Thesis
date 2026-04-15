@@ -29,15 +29,31 @@ def train(args):
     data_loader, data_loader_per_cls, class_mask, target_task_map = build_continual_dataloader(args)
 
     print(f"Creating original model: {args.original_model}")
-    model = create_model(
-        args.original_model,
-        pretrained=args.pretrained,
-        num_classes=args.nb_classes,
-        drop_rate=args.drop,
-        drop_path_rate=args.drop_path,
-        drop_block_rate=None,
-        mlp_structure=args.original_model_mlp_structure,
-    )
+    try:
+        model = create_model(
+            args.original_model,
+            pretrained=args.pretrained,
+            num_classes=args.nb_classes,
+            drop_rate=args.drop,
+            drop_path_rate=args.drop_path,
+            drop_block_rate=None,
+            mlp_structure=args.original_model_mlp_structure,
+        )
+    except RuntimeError as e:
+        if "hasRecord" in str(e) or "version" in str(e):
+            print(f"Warning: Failed to load pretrained weights: {e}")
+            print("Retrying without pretrained weights...")
+            model = create_model(
+                args.original_model,
+                pretrained=False,
+                num_classes=args.nb_classes,
+                drop_rate=args.drop,
+                drop_path_rate=args.drop_path,
+                drop_block_rate=None,
+                mlp_structure=args.original_model_mlp_structure,
+            )
+        else:
+            raise
 
     model.to(device)
 

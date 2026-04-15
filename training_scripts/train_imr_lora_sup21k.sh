@@ -40,8 +40,7 @@ echo "Using DATA_PATH=$DATA_PATH"
 
 for seed in 42
 do
-python -m torch.distributed.launch \
-        --nproc_per_node=1 \
+torchrun --nproc_per_node=1 \
         --master_port='29500' \
         --use_env main.py \
         imr_hideprompt_5e \
@@ -62,8 +61,7 @@ done
 
 for seed in 42
 do
-python -m torch.distributed.launch \
-        --nproc_per_node=2 \
+torchrun --nproc_per_node=2 \
         --master_port='29513' \
         --use_env main.py \
         imr_lora \
