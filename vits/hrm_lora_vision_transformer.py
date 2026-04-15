@@ -44,7 +44,7 @@ from timm.models.registry import register_model
 from peft.lora.continual_lora import ContinualLora
 from peft.lora.hide_lora import HideLoraPool
 from peft.lora.momentum_lora import MomentumLora
-from timm.models.layers.helpers import to_2tuple
+from timm.layers import to_2tuple
 from vits.base import MlpHead
 
 _logger = logging.getLogger(__name__)

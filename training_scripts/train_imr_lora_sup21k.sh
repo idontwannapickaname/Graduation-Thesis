@@ -1,3 +1,14 @@
+set -euo pipefail
+
+DATA_PATH="${DATA_PATH:-./datasets}"
+
+if [ ! -f "$DATA_PATH/imagenet-r.tar" ]; then
+        echo "Error: missing $DATA_PATH/imagenet-r.tar"
+        echo "Set DATA_PATH to your dataset directory, e.g.:"
+        echo "  DATA_PATH=/kaggle/input/<your-dataset-dir> bash training_scripts/train_imr_lora_sup21k.sh"
+        exit 1
+fi
+
 for seed in 42
 do
 torchrun \
@@ -10,7 +21,7 @@ torchrun \
         --batch-size 128 \
         --ca_storage_efficient_method covariance \
         --epochs 20 \
-        --data-path /home/ubuntu/wwc/hide1/HiDe-Prompt-main/datasets \
+        --data-path "$DATA_PATH" \
         --lr 0.0005 \
         --ca_lr 0.005 \
         --crct_epochs 30 \
@@ -31,7 +42,7 @@ torchrun \
         --original_model vit_base_patch16_224 \
         --batch-size 24 \
         --epochs 50 \
-        --data-path /home/ubuntu/wwc/hide1/HiDe-Prompt-main/datasets \
+        --data-path "$DATA_PATH" \
         --ca_lr 0.005 \
         --crct_epochs 30 \
         --seed 42 \
