@@ -429,18 +429,28 @@ class CUB200(torch.utils.data.Dataset):
                 print('Downloading from '+self.url)
                 download_url(self.url, root, filename=self.filename)
 
+        # Use barrier to synchronize between processes
+        if torch.distributed.is_available() and torch.distributed.is_initialized():
+            torch.distributed.barrier()
+        
         if not os.path.exists(os.path.join(root, 'CUB_200_2011')):
-            import zipfile
-            zip_ref = zipfile.ZipFile(fpath, 'r')
-            zip_ref.extractall(root)
-            zip_ref.close()
+            # Only rank 0 prepares the dataset
+            if not torch.distributed.is_available() or not torch.distributed.is_initialized() or torch.distributed.get_rank() == 0:
+                import zipfile
+                zip_ref = zipfile.ZipFile(fpath, 'r')
+                zip_ref.extractall(root)
+                zip_ref.close()
 
-            import tarfile
-            tar_ref = tarfile.open(os.path.join(root, 'CUB_200_2011.tgz'), 'r')
-            tar_ref.extractall(root)
-            tar_ref.close()
+                import tarfile
+                tar_ref = tarfile.open(os.path.join(root, 'CUB_200_2011.tgz'), 'r')
+                tar_ref.extractall(root)
+                tar_ref.close()
 
-            self.split()
+                self.split()
+            
+            # Wait for rank 0 to finish preparing the dataset
+            if torch.distributed.is_available() and torch.distributed.is_initialized():
+                torch.distributed.barrier()
         
         if self.train:
             fpath = os.path.join(root, 'CUB_200_2011', 'train')
@@ -504,13 +514,23 @@ class TinyImagenet(torch.utils.data.Dataset):
                 print('Downloading from '+self.url)
                 download_url(self.url, root, filename=self.filename)
         
+        # Use barrier to synchronize between processes
+        if torch.distributed.is_available() and torch.distributed.is_initialized():
+            torch.distributed.barrier()
+        
         if not os.path.exists(os.path.join(root, 'tiny-imagenet-200')):
-            import zipfile
-            zip_ref = zipfile.ZipFile(fpath, 'r')
-            zip_ref.extractall(os.path.join(root))
-            zip_ref.close()
+            # Only rank 0 prepares the dataset
+            if not torch.distributed.is_available() or not torch.distributed.is_initialized() or torch.distributed.get_rank() == 0:
+                import zipfile
+                zip_ref = zipfile.ZipFile(fpath, 'r')
+                zip_ref.extractall(os.path.join(root))
+                zip_ref.close()
 
-            self.split()
+                self.split()
+            
+            # Wait for rank 0 to finish preparing the dataset
+            if torch.distributed.is_available() and torch.distributed.is_initialized():
+                torch.distributed.barrier()
 
         if self.train:
             fpath = root + 'tiny-imagenet-200/train'
@@ -579,12 +599,23 @@ class Scene67(torch.utils.data.Dataset):
                 else:
                     print('Downloading from ' + url)
                     download_url(url, root, filename=fname)
+        
+        # Use barrier to synchronize between processes
+        if torch.distributed.is_available() and torch.distributed.is_initialized():
+            torch.distributed.barrier()
+        
         if not os.path.exists(os.path.join(root, 'Scene67')):
-            import tarfile
-            with tarfile.open(os.path.join(root, image_fname)) as tar:
-                tar.extractall(os.path.join(root, 'Scene67'))
+            # Only rank 0 prepares the dataset
+            if not torch.distributed.is_available() or not torch.distributed.is_initialized() or torch.distributed.get_rank() == 0:
+                import tarfile
+                with tarfile.open(os.path.join(root, image_fname)) as tar:
+                    tar.extractall(os.path.join(root, 'Scene67'))
 
-            self.split()
+                self.split()
+            
+            # Wait for rank 0 to finish preparing the dataset
+            if torch.distributed.is_available() and torch.distributed.is_initialized():
+                torch.distributed.barrier()
 
         if self.train:
             fpath = os.path.join(root, 'Scene67', 'train')
@@ -642,19 +673,29 @@ class Imagenet_R(torch.utils.data.Dataset):
             tar_ref.extractall(root)
             tar_ref.close()
         
+        # Use barrier to synchronize between processes
+        if torch.distributed.is_available() and torch.distributed.is_initialized():
+            torch.distributed.barrier()
+        
         if not os.path.exists(self.fpath + '/train') and not os.path.exists(self.fpath + '/test'):
-            self.dataset = datasets.ImageFolder(self.fpath, transform=transform)
-            
-            train_size = int(0.8 * len(self.dataset))
-            val_size = len(self.dataset) - train_size
-            
-            train, val = torch.utils.data.random_split(self.dataset, [train_size, val_size])
-            train_idx, val_idx = train.indices, val.indices
-    
-            self.train_file_list = [self.dataset.imgs[i][0] for i in train_idx]
-            self.test_file_list = [self.dataset.imgs[i][0] for i in val_idx]
+            # Only rank 0 prepares the dataset
+            if not torch.distributed.is_available() or not torch.distributed.is_initialized() or torch.distributed.get_rank() == 0:
+                self.dataset = datasets.ImageFolder(self.fpath, transform=transform)
+                
+                train_size = int(0.8 * len(self.dataset))
+                val_size = len(self.dataset) - train_size
+                
+                train, val = torch.utils.data.random_split(self.dataset, [train_size, val_size])
+                train_idx, val_idx = train.indices, val.indices
+        
+                self.train_file_list = [self.dataset.imgs[i][0] for i in train_idx]
+                self.test_file_list = [self.dataset.imgs[i][0] for i in val_idx]
 
-            self.split()
+                self.split()
+            
+            # Wait for rank 0 to finish preparing the dataset
+            if torch.distributed.is_available() and torch.distributed.is_initialized():
+                torch.distributed.barrier()
         
         if self.train:
             fpath = self.fpath + '/train'
@@ -707,19 +748,29 @@ class Imagenet_A(torch.utils.data.Dataset):
         self.train = train
         self.fpath = os.path.join(root, 'imagenet-a')
         
+        # Use barrier to synchronize between processes
+        if torch.distributed.is_available() and torch.distributed.is_initialized():
+            torch.distributed.barrier()
+        
         if not os.path.exists(self.fpath + '/train') and not os.path.exists(self.fpath + '/test'):
-            self.dataset = datasets.ImageFolder(self.fpath, transform=transform)
-            
-            train_size = int(0.8 * len(self.dataset))
-            val_size = len(self.dataset) - train_size
-            
-            train, val = torch.utils.data.random_split(self.dataset, [train_size, val_size])
-            train_idx, val_idx = train.indices, val.indices
-    
-            self.train_file_list = [self.dataset.imgs[i][0] for i in train_idx]
-            self.test_file_list = [self.dataset.imgs[i][0] for i in val_idx]
+            # Only rank 0 prepares the dataset
+            if not torch.distributed.is_available() or not torch.distributed.is_initialized() or torch.distributed.get_rank() == 0:
+                self.dataset = datasets.ImageFolder(self.fpath, transform=transform)
+                
+                train_size = int(0.8 * len(self.dataset))
+                val_size = len(self.dataset) - train_size
+                
+                train, val = torch.utils.data.random_split(self.dataset, [train_size, val_size])
+                train_idx, val_idx = train.indices, val.indices
+        
+                self.train_file_list = [self.dataset.imgs[i][0] for i in train_idx]
+                self.test_file_list = [self.dataset.imgs[i][0] for i in val_idx]
 
-            self.split()
+                self.split()
+            
+            # Wait for rank 0 to finish preparing the dataset
+            if torch.distributed.is_available() and torch.distributed.is_initialized():
+                torch.distributed.barrier()
         
         if self.train:
             fpath = self.fpath + '/train'
