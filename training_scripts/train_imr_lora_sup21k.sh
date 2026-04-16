@@ -38,26 +38,26 @@ fi
 
 echo "Using DATA_PATH=$DATA_PATH"
 
-# for seed in 42
-# do
-# python -m torch.distributed.launch \
-#         --nproc_per_node=1 \
-#         --master_port='29500' \
-#         --use_env main.py \
-#         imr_hideprompt_5e \
-#         --model vit_base_patch16_224 \
-#         --original_model vit_base_patch16_224 \
-#         --batch-size 128 \
-#         --ca_storage_efficient_method covariance \
-#         --epochs 20 \
-#         --data-path "$DATA_PATH" \
-#         --lr 0.0005 \
-#         --ca_lr 0.005 \
-#         --crct_epochs 30 \
-#         --seed $seed \
-#         --train_inference_task_only \
-#         --output_dir ./output/imr_vit_multi_centroid_mlp_2_seed$seed
-# done
+for seed in 42
+do
+python -m torch.distributed.launch \
+        --nproc_per_node=1 \
+        --master_port='29500' \
+        --use_env main.py \
+        imr_hideprompt_5e \
+        --model vit_base_patch16_224 \
+        --original_model vit_base_patch16_224 \
+        --batch-size 128 \
+        --ca_storage_efficient_method covariance \
+        --epochs 20 \
+        --data-path "$DATA_PATH" \
+        --lr 0.0005 \
+        --ca_lr 0.005 \
+        --crct_epochs 30 \
+        --seed $seed \
+        --train_inference_task_only \
+        --output_dir ./output/imr_vit_multi_centroid_mlp_2_seed$seed
+done
 
 
 for seed in 42
