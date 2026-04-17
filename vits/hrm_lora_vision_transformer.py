@@ -1002,11 +1002,22 @@ def _create_vision_transformer(variant, pretrained=False, **kwargs):
         raise RuntimeError('features_only not implemented for Vision Transformer models.')
 
     pretrained_cfg = resolve_pretrained_cfg(variant, pretrained_cfg=kwargs.pop('pretrained_cfg', None))
-    model = build_model_with_cfg(
-        VisionTransformer, variant, pretrained,
-        pretrained_cfg=pretrained_cfg,
-        pretrained_filter_fn=checkpoint_filter_fn,
-        **kwargs)
+    try:
+        model = build_model_with_cfg(
+            VisionTransformer, variant, pretrained,
+            pretrained_cfg=pretrained_cfg,
+            pretrained_filter_fn=checkpoint_filter_fn,
+            **kwargs)
+    except RuntimeError as e:
+        if 'hasRecord("version")' in str(e) and pretrained:
+            print(f"Warning: Failed to load pretrained weights for {variant} (corrupted cache). Loading model without pretrained weights.")
+            model = build_model_with_cfg(
+                VisionTransformer, variant, False,
+                pretrained_cfg=pretrained_cfg,
+                pretrained_filter_fn=checkpoint_filter_fn,
+                **kwargs)
+        else:
+            raise
     return model
 
 
