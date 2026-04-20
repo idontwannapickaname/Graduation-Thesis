@@ -57,7 +57,7 @@ def train(args):
             checkpoint_path = os.path.join(args.output_dir, 'checkpoint/task{}_checkpoint.pth'.format(task_id + 1))
             if os.path.exists(checkpoint_path):
                 print('Loading checkpoint from:', checkpoint_path)
-                checkpoint = torch.load(checkpoint_path, map_location=device)
+                checkpoint = torch.load(checkpoint_path, map_location=device, weights_only=False)
                 model.load_state_dict(checkpoint['model'])
             else:
                 print('No checkpoint found at:', checkpoint_path)
@@ -66,7 +66,7 @@ def train(args):
                                                     'checkpoint/task{}_checkpoint.pth'.format(task_id + 1))
             if os.path.exists(original_checkpoint_path):
                 print('Loading checkpoint from:', original_checkpoint_path)
-                original_checkpoint = torch.load(original_checkpoint_path, map_location=device)
+                original_checkpoint = torch.load(original_checkpoint_path, map_location=device, weights_only=False)
                 original_model.load_state_dict(original_checkpoint['model'])
             else:
                 print('No checkpoint found at:', original_checkpoint_path)

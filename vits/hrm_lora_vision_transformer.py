@@ -44,7 +44,7 @@ from timm.models.registry import register_model
 from peft.lora.continual_lora import ContinualLora
 from peft.lora.hide_lora import HideLoraPool
 from peft.lora.momentum_lora import MomentumLora
-from timm.models.layers.helpers import to_2tuple
+from timm.layers import to_2tuple
 from vits.base import MlpHead
 
 _logger = logging.getLogger(__name__)
@@ -1002,12 +1002,22 @@ def _create_vision_transformer(variant, pretrained=False, **kwargs):
         raise RuntimeError('features_only not implemented for Vision Transformer models.')
 
     pretrained_cfg = resolve_pretrained_cfg(variant, pretrained_cfg=kwargs.pop('pretrained_cfg', None))
-    model = build_model_with_cfg(
-        VisionTransformer, variant, pretrained,
-        pretrained_cfg=pretrained_cfg,
-        pretrained_filter_fn=checkpoint_filter_fn,
-        pretrained_custom_load='npz' in pretrained_cfg['url'],
-        **kwargs)
+    try:
+        model = build_model_with_cfg(
+            VisionTransformer, variant, pretrained,
+            pretrained_cfg=pretrained_cfg,
+            pretrained_filter_fn=checkpoint_filter_fn,
+            **kwargs)
+    except RuntimeError as e:
+        if 'hasRecord("version")' in str(e) and pretrained:
+            print(f"Warning: Failed to load pretrained weights for {variant} (corrupted cache). Loading model without pretrained weights.")
+            model = build_model_with_cfg(
+                VisionTransformer, variant, False,
+                pretrained_cfg=pretrained_cfg,
+                pretrained_filter_fn=checkpoint_filter_fn,
+                **kwargs)
+        else:
+            raise
     return model
 
 
