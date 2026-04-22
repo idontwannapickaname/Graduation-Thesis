@@ -44,6 +44,25 @@ def train(args):
     if not base_path.is_absolute():
         base_path = (repo_root / base_path).resolve()
 
+    # Backward-compatibility shim for ImageNet-R configs/loaders that still
+    # reference paths like "lear/data/imagenet-r/...".
+    if args.dataset == "seq-imagenet-r":
+        source_imr = base_path / "imagenet-r"
+        lear_data_dir = lear_root / "data"
+        target_imr = lear_data_dir / "imagenet-r"
+
+        if source_imr.exists():
+            lear_data_dir.mkdir(parents=True, exist_ok=True)
+            if not target_imr.exists():
+                try:
+                    os.symlink(source_imr, target_imr, target_is_directory=True)
+                    print(f"Created symlink: {target_imr} -> {source_imr}")
+                except OSError:
+                    # Symlink may be unsupported; mirror as fallback.
+                    import shutil
+                    shutil.copytree(source_imr, target_imr, dirs_exist_ok=True)
+                    print(f"Copied ImageNet-R into compatibility path: {target_imr}")
+
     output_dir = Path(args.output_dir).expanduser()
     if not output_dir.is_absolute():
         output_dir = (repo_root / output_dir).resolve()
