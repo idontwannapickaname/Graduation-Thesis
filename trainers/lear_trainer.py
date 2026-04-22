@@ -5,6 +5,29 @@ import sys
 from pathlib import Path
 
 
+def _normalize_lear_device(device_arg: str | None) -> str | None:
+    if not device_arg:
+        return None
+
+    value = device_arg.strip().lower()
+    if value in {"cpu", "mps", "auto"}:
+        return None
+    if value == "cuda":
+        return "0"
+    if value.startswith("cuda:"):
+        return value.split(":", 1)[1]
+    if "," in value:
+        parts = [p.strip() for p in value.split(",")]
+        normalized = []
+        for part in parts:
+            if part.startswith("cuda:"):
+                normalized.append(part.split(":", 1)[1])
+            else:
+                normalized.append(part)
+        return ",".join(normalized)
+    return value
+
+
 def train(args):
     repo_root = Path(__file__).resolve().parents[1]
     lear_root = repo_root / "lear"
@@ -49,8 +72,9 @@ def train(args):
         str(base_path),
     ]
 
-    if args.device:
-        run_cmd.extend(["--device", args.device])
+    lear_device = _normalize_lear_device(getattr(args, "device", None))
+    if lear_device is not None:
+        run_cmd.extend(["--device", lear_device])
 
     env = os.environ.copy()
     env.setdefault("MAMMOTH_TEST", "0")
