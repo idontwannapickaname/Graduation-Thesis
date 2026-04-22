@@ -197,7 +197,7 @@ def get_all_datasets(args: Namespace) -> ContinualDataset:
     #You can create custom domain sequence here
         #You can create custom domain sequence here
     # Only run the requested four datasets for LEAR domain sequence.
-    dataset_names = ['seq-cifar10', 'seq-cifar100', 'seq-cub200', 'seq-tinyimg-r']
+    dataset_names =  ['seq-imagenet-r', 'seq-cifar10', 'seq-cub200', 'seq-cifar100', 'seq-tinyimg-r']
     #dataset_names = ['seq-cub200']
     # For single dataset usage, only load the specified dataset
     dataset_list = []
