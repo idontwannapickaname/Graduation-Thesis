@@ -74,8 +74,50 @@ class MyImagenetR(Dataset):
         else:
             data_config = yaml.load(open(pwd + '/imagenet_r_utils/imagenet-r_test.yaml'), Loader=yaml.Loader)
 
-        self.data = np.array(data_config['data'])
-        self.targets = np.array(data_config['targets'])
+        raw_data = data_config['data']
+        raw_targets = data_config['targets']
+        self.data, self.targets = self._load_existing_samples(raw_data, raw_targets)
+
+    def _resolve_img_path(self, img_path: str) -> str:
+        if os.path.isabs(img_path):
+            return img_path
+
+        normalized_root = self.root.rstrip('/')
+        prefix = 'data/imagenet-r/'
+        if img_path.startswith(prefix):
+            return smart_joint(normalized_root, img_path[len(prefix):])
+        if img_path.startswith('imagenet-r/'):
+            return smart_joint(normalized_root, img_path[len('imagenet-r/'):])
+        return smart_joint(normalized_root, img_path)
+
+    def _load_existing_samples(self, data, targets):
+        existing_data = []
+        existing_targets = []
+        missing_count = 0
+
+        for img_path, target in zip(data, targets):
+            resolved = self._resolve_img_path(img_path)
+            if os.path.exists(resolved):
+                existing_data.append(resolved)
+                existing_targets.append(target)
+            else:
+                missing_count += 1
+
+        if missing_count > 0:
+            logging.warning(
+                "ImageNet-R split contains %d missing files under %s. "
+                "They will be skipped.",
+                missing_count,
+                self.root
+            )
+
+        if len(existing_data) == 0:
+            raise RuntimeError(
+                f"No valid ImageNet-R samples found in {self.root}. "
+                "Please check --base_path and dataset extraction."
+            )
+
+        return np.array(existing_data), np.array(existing_targets)
 
     def __len__(self):
         return len(self.targets)
