@@ -52,6 +52,18 @@ def get_args():
     elif config == 'ima_lora':
         from configs.ima_lora import get_args_parser
         config_parser = subparser.add_parser('ima_lora', help='Split-ImageNet-A lora configs')
+    elif config == 'imr_lear':
+        from configs.imr_lear import get_args_parser
+        config_parser = subparser.add_parser('imr_lear', help='Split-ImageNet-R LEAR configs')
+    elif config == 'ima_lear':
+        from configs.ima_lear import get_args_parser
+        config_parser = subparser.add_parser('ima_lear', help='Split-ImageNet-A LEAR configs')
+    elif config == 'cifar100_lear':
+        from configs.cifar100_lear import get_args_parser
+        config_parser = subparser.add_parser('cifar100_lear', help='Split-CIFAR100 LEAR configs')
+    elif config == 'five_datasets_lear':
+        from configs.five_datasets_lear import get_args_parser
+        config_parser = subparser.add_parser('five_datasets_lear', help='Five-datasets LEAR configs')
     else:
         raise NotImplementedError
 
@@ -77,6 +89,9 @@ def main(args):
     elif 'lora' in args.config and not args.train_inference_task_only:
         import trainers.lora_trainer as lora_trainer
         lora_trainer.train(args)
+    elif 'lear' in args.config:
+        import trainers.lear_trainer as lear_trainer
+        lear_trainer.train(args)
     else:
         raise NotImplementedError
 
