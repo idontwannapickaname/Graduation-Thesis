@@ -206,9 +206,20 @@ def get_all_datasets(args: Namespace) -> ContinualDataset:
         print(name)
         args.dataset = name
         dataset_class, dataset_args = get_dataset_class(args, return_args=True)
-        missing_args = [arg for arg in dataset_args.keys() if arg not in vars(args)]
-        assert len(missing_args) == 0, "Missing arguments for the dataset: " + ', '.join(missing_args)
-        parsed_args = {arg: getattr(args, arg) for arg in dataset_args.keys()}
+        parsed_args = {}
+        missing_required_args = []
+        for arg_name, arg_spec in dataset_args.items():
+            default_value = arg_spec.get('default') if isinstance(arg_spec, dict) else arg_spec
+            is_required = bool(arg_spec.get('required', False)) if isinstance(arg_spec, dict) else False
+            if hasattr(args, arg_name):
+                parsed_args[arg_name] = getattr(args, arg_name)
+            elif not is_required:
+                # Use dataset-specific default for args not present in the initial parser.
+                parsed_args[arg_name] = default_value
+            else:
+                missing_required_args.append(arg_name)
+
+        assert len(missing_required_args) == 0, "Missing arguments for the dataset: " + ', '.join(missing_required_args)
         dataset_list.append(dataset_class(args, **parsed_args))
 
     return dataset_list
