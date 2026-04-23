@@ -17,5 +17,15 @@ def get_args_parser(subparsers):
     subparsers.add_argument('--backbone', default='lear', type=str, help='LEAR backbone name')
     subparsers.add_argument('--base_path', default='./data/', type=str, help='Base path used by LEAR')
 
+    # LEAR checkpoint passthrough options for bridge workflows
+    subparsers.add_argument('--lear_savecheck', default='last', choices=['last', 'task', 'none'], type=str,
+                            help='LEAR savecheck mode passed to Mammoth')
+    subparsers.add_argument('--lear_ckpt_name', default='imr_lear_bridge', type=str,
+                            help='Checkpoint name prefix passed to Mammoth')
+    subparsers.add_argument('--lear_loadcheck', default='', type=str,
+                            help='Optional LEAR checkpoint path passed to Mammoth')
+    subparsers.add_argument('--lear_inference_only', action='store_true',
+                            help='Run LEAR in inference-only mode')
+
     # Keep compatibility with existing main dispatch logic
     subparsers.add_argument('--train_inference_task_only', action='store_true')
