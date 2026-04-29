@@ -10,7 +10,7 @@ MODE="${MODE:-train}"
 SEEDS="${SEEDS:-42}"
 
 # LEAR -> HRM bridge settings
-LEAR_CHECKPOINT_PATH="${LEAR_CHECKPOINT_PATH:-.lear/checkpoints/lear_seq-imagenet-r_default_0_5_last.pt}"
+LEAR_CHECKPOINT_PATH="${LEAR_CHECKPOINT_PATH:-./lear/checkpoints/lear_seq-imagenet-r_default_0_5_last.pt}"
 HRM_OUTPUT_DIR="${HRM_OUTPUT_DIR:-./output/imr_lear_to_hrm}"
 HRM_CONFIG="${HRM_CONFIG:-imr_hideprompt_5e}"
 HRM_MODEL="${HRM_MODEL:-vit_base_patch16_224}"
