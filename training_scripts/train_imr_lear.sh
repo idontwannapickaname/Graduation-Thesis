@@ -10,7 +10,7 @@ MODE="${MODE:-train}"
 SEEDS="${SEEDS:-42}"
 
 # LEAR -> HRM bridge settings
-LEAR_CHECKPOINT_PATH="${LEAR_CHECKPOINT_PATH:-./lear/checkpoints/lear_seq-imagenet-r_default_0_5_last.pt}"
+LEAR_CHECKPOINT_PATH="${LEAR_CHECKPOINT_PATH:-}"
 HRM_OUTPUT_DIR="${HRM_OUTPUT_DIR:-./output/imr_lear_to_hrm}"
 HRM_CONFIG="${HRM_CONFIG:-imr_hideprompt_5e}"
 HRM_MODEL="${HRM_MODEL:-vit_base_patch16_224}"
@@ -58,6 +58,33 @@ fi
 echo "Using DATA_PATH=$DATA_PATH"
 echo "Running MODE=$MODE"
 
+resolve_lear_checkpoint() {
+    seed="$1"
+    requested_path="$2"
+
+    if [ -n "$requested_path" ] && [ -f "$requested_path" ]; then
+        printf '%s\n' "$requested_path"
+        return 0
+    fi
+
+    candidate_file="./output/imr_lear_seed${seed}/lear_checkpoint_path.txt"
+    if [ -f "$candidate_file" ]; then
+        resolved_path="$(head -n 1 "$candidate_file")"
+        if [ -f "$resolved_path" ]; then
+            printf '%s\n' "$resolved_path"
+            return 0
+        fi
+    fi
+
+    latest_candidate="$(find ./lear/checkpoints -maxdepth 1 -type f -name '*.pt' | sort | tail -n 1 || true)"
+    if [ -n "$latest_candidate" ] && [ -f "$latest_candidate" ]; then
+        printf '%s\n' "$latest_candidate"
+        return 0
+    fi
+
+    return 1
+}
+
 run_lear_train() {
     seed="$1"
     ckpt_prefix="imr_lear_bridge_seed${seed}"
@@ -103,22 +130,35 @@ run_hrm_eval_from_lear() {
     checkpoint_path="$2"
     hrm_seed_output_dir="${HRM_OUTPUT_DIR}_seed${seed}"
 
-    if [ ! -f "$checkpoint_path" ]; then
-        candidate_file="./output/imr_lear_seed${seed}/lear_checkpoint_path.txt"
-        if [ -f "$candidate_file" ]; then
-            checkpoint_path="$(cat "$candidate_file")"
-            echo "Resolved LEAR checkpoint from $candidate_file"
-        fi
-    fi
+    mkdir -p "$hrm_seed_output_dir"
 
-    if [ ! -f "$checkpoint_path" ]; then
+    resolved_checkpoint="$(resolve_lear_checkpoint "$seed" "$checkpoint_path" || true)"
+    if [ -z "$resolved_checkpoint" ] || [ ! -f "$resolved_checkpoint" ]; then
         echo "Error: LEAR checkpoint not found: $checkpoint_path"
-        echo "Set LEAR_CHECKPOINT_PATH to a valid .pt file or run MODE=train first."
+        echo "Set LEAR_CHECKPOINT_PATH to a valid .pt file or run MODE=train first so the script can record lear_checkpoint_path.txt."
         exit 1
     fi
 
+    echo "Using LEAR checkpoint: $resolved_checkpoint"
+
+    learner_state_dict_path="$hrm_seed_output_dir/lear_state_dict.pt"
+    python - "$resolved_checkpoint" "$learner_state_dict_path" <<'PY'
+import sys
+from pathlib import Path
+import torch
+
+source_path = Path(sys.argv[1]).expanduser().resolve()
+target_path = Path(sys.argv[2]).expanduser().resolve()
+
+checkpoint = torch.load(str(source_path), map_location='cpu', weights_only=False)
+state_dict = checkpoint['model'] if isinstance(checkpoint, dict) and 'model' in checkpoint else checkpoint
+
+torch.save({'model': state_dict}, str(target_path))
+print(f"Saved LEAR state dict to: {target_path}")
+PY
+
     python scripts/convert_lear_checkpoint_to_hrm.py \
-        --lear-checkpoint "$checkpoint_path" \
+        --lear-checkpoint "$learner_state_dict_path" \
         --output-dir "$hrm_seed_output_dir" \
         --model "$HRM_MODEL" \
         --num-classes "$HRM_NUM_CLASSES" \
