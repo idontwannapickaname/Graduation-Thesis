@@ -108,6 +108,19 @@ class LEAR(ContinualModel):
 
     def begin_task(self, dataset, threshold=0) -> None:
         train_loader = dataset.train_loader
+        if not hasattr(self, 'class_to_task'):
+            self.class_to_task = {}
+
+        if isinstance(self.dataset.N_CLASSES_PER_TASK, int):
+            start_class = self.current_task * self.dataset.N_CLASSES_PER_TASK
+            end_class = start_class + self.dataset.N_CLASSES_PER_TASK
+        else:
+            start_class = sum(self.dataset.N_CLASSES_PER_TASK[:self.current_task])
+            end_class = sum(self.dataset.N_CLASSES_PER_TASK[:self.current_task + 1])
+
+        for class_idx in range(start_class, end_class):
+            self.class_to_task[class_idx] = self.current_task
+
         if self.current_task > 0:
             num_choose = 50
             with torch.no_grad():
@@ -167,6 +180,37 @@ class LEAR(ContinualModel):
             #Perform the prediction according to the seloeced expert
             out = self.net.myprediction(x,k)
         return out
+
+    def hybrid_rematch(self, x):
+        with torch.no_grad():
+            distances = self.cal_expert_dist(x)
+            expert_idx = int(torch.argmin(torch.tensor(distances, device=x.device)).item())
+            outputs = self.myPrediction(x, expert_idx)
+
+            if len(self.net.classifierArr) <= 1 or not hasattr(self, 'class_to_task'):
+                return outputs
+
+            predicted_classes = torch.argmax(outputs, dim=1)
+            rematch_tasks = [self.class_to_task.get(pred.item(), expert_idx) for pred in predicted_classes]
+
+            if not rematch_tasks:
+                return outputs
+
+            rematch_task = Counter(rematch_tasks).most_common(1)[0][0]
+            if rematch_task == expert_idx:
+                return outputs
+
+            rematched_outputs = self.myPrediction(x, rematch_task)
+            if gen_entropy(rematched_outputs) < gen_entropy(outputs):
+                return rematched_outputs
+
+            return outputs
+
+    def forward(self, inputs, *args, **kwargs):
+        if self.training:
+            return self.net(inputs, *args, **kwargs)
+
+        return self.hybrid_rematch(inputs)
 
     def observe(self, inputs, labels, not_aug_inputs, epoch=None):
         l2_distance = torch.nn.MSELoss()
@@ -235,3 +279,8 @@ def kl_loss(student_feat, teacher_feat):
         reduction='batchmean'
     )
     return loss_kld
+
+
+def gen_entropy(outputs):
+    probabilities = F.softmax(outputs, dim=1)
+    return -(probabilities * torch.log(probabilities + 1e-12)).sum(dim=1).mean()
