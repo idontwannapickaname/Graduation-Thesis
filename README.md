@@ -1,4 +1,4 @@
-# LRGR
+# LEAR
 
 The implementation for **"[Learning Expandable and Adaptable Representations for Continual Learning]"**
 
