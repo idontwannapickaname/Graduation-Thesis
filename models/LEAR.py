@@ -162,10 +162,10 @@ class LEAR(ContinualModel):
 
         self.opt = self.get_optimizer()
 
-    def myPrediction(self,x,k):
+    def myPrediction(self,x, tau=-10.0, N=2):
         with torch.no_grad():
             #Perform the prediction according to the seloeced expert
-            out = self.net.myprediction(x,k)
+            out = self.hybrid_rematch(x, tau, N)
         return out
 
     def observe(self, inputs, labels, not_aug_inputs, epoch=None):
@@ -220,7 +220,94 @@ class LEAR(ContinualModel):
             distances[t] += mahalanobis.mean().item()
         return distances
 
+    def hybrid_rematch(self, x, tau=-10.0, N=2, M=100, gamma=0.1):
+        """
+        Hybrid Re-matching inference for LEAR.
+        Replaces the simple argmin(distances) call in evaluation.
 
+        x      : input batch, already on self.device
+        tau    : CRM confidence threshold (GEN entropy). Re-tune on val set.
+        N      : number of top candidate experts for CRM (keep at 2)
+        M      : top-M probabilities used in GEN entropy
+        gamma  : GEN entropy hyperparameter
+        """
+        with torch.no_grad():
+
+            # ── Step 1: ESM initial matching (same as cal_expert_dist) ──────────
+            distances = self.cal_expert_dist(x)          # list of floats, len=num_experts
+            ranked = np.argsort(distances)               # ascending: ranked[0] = best match
+            t_f = int(ranked[0])                         # initial task identity
+
+            # ── Step 2: forward with initially matched expert ───────────────────
+            logits_f = self.net.myprediction(x, t_f)    # shape [B, num_classes]
+            y_hat = logits_f.argmax(dim=-1)              # [B]
+
+            # ── Step 3: Direct Re-matching (DRM) ────────────────────────────────
+            # Map each predicted class back to its task identity
+            t_s_direct_per_sample = torch.tensor(
+                [self.class_to_task.get(c.item(), t_f) for c in y_hat],
+                device=self.device
+            )                                            # [B]
+
+            # Check if any sample's predicted class belongs to a different task
+            needs_drm = (t_s_direct_per_sample != t_f)  # [B] bool mask
+
+            if needs_drm.any():
+                # For simplicity: if majority of batch points to a new task, re-run
+                # (batches in LEAR eval are typically per-domain; single expert per call)
+                counts = Counter(t_s_direct_per_sample[needs_drm].tolist())
+                t_s_drm = counts.most_common(1)[0][0]   # most voted task
+
+                logits_drm = self.net.myprediction(x, t_s_drm)
+                y_hat_drm  = logits_drm.argmax(dim=-1)
+
+                # For samples that triggered DRM, update prediction and logits
+                logits_f[needs_drm] = logits_drm[needs_drm]
+                y_hat[needs_drm]    = y_hat_drm[needs_drm]
+
+                # DRM resolved these samples — mark them done
+                drm_resolved = needs_drm                # [B] bool
+
+            else:
+                drm_resolved = torch.zeros(x.shape[0], dtype=torch.bool,
+                                        device=self.device)
+
+            # ── Step 4: Confidence-based Re-matching (CRM) ──────────────────────
+            # Only run CRM on samples NOT already fixed by DRM
+            crm_candidates = ~drm_resolved              # [B] bool
+
+            if crm_candidates.any():
+                E = gen_entropy(logits_f, M=M, gamma=gamma)  # [B]
+
+                # Samples with low confidence (E <= tau) are suspected mismatches
+                low_conf = crm_candidates & (E <= tau)       # [B] bool
+
+                if low_conf.any():
+                    x_lc = x[low_conf]                       # subset of low-conf samples
+
+                    # Get top-N expert candidates from ESM ranking
+                    Gamma = ranked[:N].tolist()              # e.g. [t_f, second_best]
+
+                    # Compare GEN entropy for each candidate expert
+                    best_E      = torch.full((low_conf.sum(),), -float('inf'),
+                                            device=self.device)
+                    best_logits = logits_f[low_conf].clone()
+
+                    for c in Gamma:
+                        logits_c = self.net.myprediction(x_lc, c)   # [B_lc, C]
+                        E_c      = gen_entropy(logits_c, M=M,
+                                            gamma=gamma)          # [B_lc]
+
+                        # Update best where this expert is more confident
+                        improved = E_c > best_E                      # [B_lc] bool
+                        best_logits[improved] = logits_c[improved]
+                        best_E[improved]      = E_c[improved]
+
+                    # Write CRM results back
+                    lc_indices = low_conf.nonzero(as_tuple=True)[0]
+                    y_hat[lc_indices]    = best_logits.argmax(dim=-1)
+
+        return y_hat
 
 def kl_loss(student_feat, teacher_feat):
     student_feat = F.normalize(student_feat, p=2, dim=1)
@@ -235,3 +322,16 @@ def kl_loss(student_feat, teacher_feat):
         reduction='batchmean'
     )
     return loss_kld
+
+def gen_entropy(logits, M=100, gamma=0.1):
+    """
+    Post-hoc Generalized ENtropy (GEN) from HRM-PET Eq.3.
+    logits: tensor of shape [B, num_classes]
+    Returns entropy score per sample, shape [B].
+    Higher = more confident (less likely mismatched).
+    """
+    probs = torch.softmax(logits, dim=-1)                        # [B, C]
+    top_probs, _ = torch.topk(probs, min(M, probs.shape[-1]),
+                               dim=-1)                            # [B, M]
+    entropy = -(top_probs ** gamma * (1 - top_probs ** gamma))   # [B, M]
+    return entropy.sum(dim=-1)                                    # [B]
