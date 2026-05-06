@@ -107,6 +107,27 @@ class LEAR(ContinualModel):
                 param.requires_grad = False
 
     def begin_task(self, dataset, threshold=0) -> None:
+        if not hasattr(dataset.train_loader.dataset, 'targets'):
+            # fallback: scan one batch
+            unique_classes = set()
+            for data in dataset.train_loader:
+                unique_classes.update(data[1].tolist())
+                break  # one batch is enough to get class indices
+            
+        if not hasattr(self, 'class_to_task'):
+            self.class_to_task = {}
+
+        # Infer task classes directly from the train loader's targets
+        targets = dataset.train_loader.dataset.targets
+        if isinstance(targets, list):
+            unique_classes = set(targets)
+        else:
+            # tensor or numpy array
+            unique_classes = set(targets.tolist())
+
+        for class_idx in unique_classes:
+            self.class_to_task[class_idx] = self.current_task
+
         train_loader = dataset.train_loader
         if self.current_task > 0:
             num_choose = 50
