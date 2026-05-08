@@ -54,7 +54,7 @@ LEAR/
 
 ## 🙏 Acknowledgement
 
-This code is based on this papers below:
+This code is based on these papers below:
 
 ```bibtex
 @inproceedings{lear,
@@ -63,8 +63,7 @@ This code is based on this papers below:
   booktitle={The Thirty-ninth Annual Conference on Neural Information Processing Systems}
 }
 
-@inproceedings{
-hrm_pet,
+@inproceedings{hrm_pet,
 title={Hybrid Re-matching for Continual Learning with Parameter-Efficient Tuning},
 author={Weicheng Wang and Guoli Jia and Xialei Liu and Liang Lin and Jufeng Yang},
 booktitle={The Thirty-ninth Annual Conference on Neural Information Processing Systems},
