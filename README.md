@@ -1,6 +1,7 @@
-# LEAR
+# NeurIPS2025-LEAR
+[![Python](https://img.shields.io/badge/Python-3.10%2B-blue)](https://www.python.org/) [![Paper](https://img.shields.io/badge/Paper-OpenReview-red)](https://openreview.net/pdf?id=uXKgVqYTJ2) ![License](https://img.shields.io/badge/License-MIT-green.svg) ![NeurIPS](https://img.shields.io/badge/NeurIPS-2025-purple.svg) 
 
-The implementation for **"[Learning Expandable and Adaptable Representations for Continual Learning]"**
+The official implementation for **"[Learning Expandable and Adaptable Representations for Continual Learning](https://openreview.net/pdf?id=uXKgVqYTJ2)"** (NeurIPS2025) 
 
 ------
 
@@ -8,20 +9,10 @@ The implementation for **"[Learning Expandable and Adaptable Representations for
 
 ### **1. Create env and install requirements**
 
-If you are using conda environment
-
 ```bash
-conda create -n LEAR python=3.11
+conda create -n LEAR python=3.10
 conda activate LEAR
 pip install -r requirements.txt
-```
-
-Or if you are using uv instead
-
-```bash
-uv venv LEAR
-source LEAR/bin/activate
-uv pip install -r requirement.txt
 ```
 
 ### **2. Run the example training script**
@@ -52,14 +43,20 @@ LEAR/
 
 ------
 
-## 🙏 Acknowledgement
+## 📝 Citation
 
-This code is based on this papers below:
+If you find this repository helpful, please click the ⭐Star and cite our paper:
 
-```bibtex
+```
 @inproceedings{yulearning,
   title={Learning Expandable and Adaptable Representations for Continual Learning},
   author={Yu, Ruilong and Liu, Mingyan and Ye, Fei and Bors, Adrian G and Hu, Rongyao and others},
   booktitle={The Thirty-ninth Annual Conference on Neural Information Processing Systems}
 }
 ```
+
+------
+
+## 🙏 Acknowledgement
+
+Thanks for the awesome continual learning framework **[Mammoth](https://github.com/aimagelab/mammoth)**.
