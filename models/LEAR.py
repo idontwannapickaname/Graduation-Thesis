@@ -107,6 +107,28 @@ class LEAR(ContinualModel):
                 param.requires_grad = False
 
     def begin_task(self, dataset, threshold=0) -> None:
+        if not hasattr(self, 'class_to_task'):
+            self.class_to_task = {}
+
+        try:
+            targets = dataset.train_loader.dataset.targets
+            if isinstance(targets, list):
+                unique_classes = set(targets)
+            else:
+                unique_classes = set(targets.tolist())
+        except AttributeError:
+            unique_classes = set()
+            for batch in dataset.train_loader:
+                labels = batch[1]
+                if isinstance(labels, torch.Tensor):
+                    unique_classes.update(labels.tolist())
+                else:
+                    unique_classes.update(labels)
+                break
+
+        for class_idx in unique_classes:
+            self.class_to_task[class_idx] = self.current_task
+
         train_loader = dataset.train_loader
         if self.current_task > 0:
             num_choose = 50
@@ -220,6 +242,66 @@ class LEAR(ContinualModel):
             distances[t] += mahalanobis.mean().item()
         return distances
 
+    def hybrid_rematch(self, x, tau=-10.0, N=2, M=100, gamma=0.1):
+        with torch.no_grad():
+            # Step 1: ESM initial matching
+            distances = self.cal_expert_dist(x)
+            ranked = np.argsort(distances)
+            t_f = int(ranked[0])
+
+            # Step 2: forward with initially matched expert
+            logits_f = self.net.myprediction(x, t_f)
+            y_hat = logits_f.argmax(dim=-1)
+
+            # Step 3: Direct Re-matching (DRM)
+            t_s_direct_per_sample = torch.tensor(
+                [self.class_to_task.get(c.item(), t_f) for c in y_hat],
+                device=self.device
+            )
+            needs_drm = (t_s_direct_per_sample != t_f)
+
+            drm_resolved = torch.zeros(x.shape[0], dtype=torch.bool,
+                                       device=self.device)
+
+            if needs_drm.any():
+                counts = Counter(t_s_direct_per_sample[needs_drm].tolist())
+                t_s_drm = counts.most_common(1)[0][0]
+                logits_drm = self.net.myprediction(x, t_s_drm)
+                y_hat_drm = logits_drm.argmax(dim=-1)
+                logits_f[needs_drm] = logits_drm[needs_drm]
+                y_hat[needs_drm] = y_hat_drm[needs_drm]
+                drm_resolved = needs_drm
+
+            # Step 4: Confidence-based Re-matching (CRM)
+            crm_candidates = ~drm_resolved
+
+            if crm_candidates.any():
+                E = gen_entropy(logits_f, M=M, gamma=gamma)
+                low_conf = crm_candidates & (E <= tau)
+
+                if low_conf.any():
+                    x_lc = x[low_conf]
+                    Gamma = ranked[:N].tolist()
+                    best_E = torch.full((low_conf.sum(),), -float('inf'),
+                                        device=self.device)
+                    best_logits = logits_f[low_conf].clone()
+
+                    for c in Gamma:
+                        logits_c = self.net.myprediction(x_lc, c)
+                        E_c = gen_entropy(logits_c, M=M, gamma=gamma)
+                        improved = E_c > best_E
+                        best_logits[improved] = logits_c[improved]
+                        best_E[improved] = E_c[improved]
+
+                    lc_indices = low_conf.nonzero(as_tuple=True)[0]
+                    y_hat[lc_indices] = best_logits.argmax(dim=-1)
+
+        return y_hat
+
+    def forward(self, x):
+        if not self.training:
+            return self.hybrid_rematch(x)
+        return self.net(x)
 
 
 def kl_loss(student_feat, teacher_feat):
@@ -235,3 +317,10 @@ def kl_loss(student_feat, teacher_feat):
         reduction='batchmean'
     )
     return loss_kld
+
+
+def gen_entropy(logits, M=100, gamma=0.1):
+    probs = torch.softmax(logits, dim=-1)
+    top_probs, _ = torch.topk(probs, min(M, probs.shape[-1]), dim=-1)
+    entropy = -(top_probs ** gamma * (1 - top_probs ** gamma))
+    return entropy.sum(dim=-1)
