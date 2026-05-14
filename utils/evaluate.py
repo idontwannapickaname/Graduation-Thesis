@@ -82,7 +82,7 @@ def evaluate(model: 'ContinualModel', dataset: 'ContinualDataset', last=False, r
                     outputs = model.future_forward(inputs)
                 else:
                     if model.NAME == 'LEAR' and hasattr(model, 'hybrid_rematch'):
-                        y_hat, outputs = model.hybrid_rematch(inputs)
+                        y_hat, outputs = model.hybrid_rematch(inputs,)
                     else:
                         outputs = model(inputs)
 

@@ -242,7 +242,7 @@ class LEAR(ContinualModel):
             distances[t] += mahalanobis.mean().item()
         return distances
 
-    def hybrid_rematch(self, x, tau=-8.0, N=2, M=50, gamma=0.1):
+    def hybrid_rematch(self, x, tau=-10.0, N=2, M=20, gamma=0.1):
         with torch.no_grad():
             # Step 1: ESM initial matching
             distances = self.cal_expert_dist(x)
