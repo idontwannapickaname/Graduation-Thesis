@@ -296,12 +296,7 @@ class LEAR(ContinualModel):
                     lc_indices = low_conf.nonzero(as_tuple=True)[0]
                     y_hat[lc_indices] = best_logits.argmax(dim=-1)
 
-        return y_hat
-
-    def forward(self, x):
-        if not self.training:
-            return self.hybrid_rematch(x)
-        return self.net(x)
+        return y_hat, logits_f
 
 
 def kl_loss(student_feat, teacher_feat):

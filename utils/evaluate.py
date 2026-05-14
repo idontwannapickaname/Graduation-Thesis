@@ -81,7 +81,10 @@ def evaluate(model: 'ContinualModel', dataset: 'ContinualDataset', last=False, r
                 if model.args.eval_future and k >= model.current_task:
                     outputs = model.future_forward(inputs)
                 else:
-                    outputs = model(inputs)
+                    if model.NAME == 'LEAR' and hasattr(model, 'hybrid_rematch'):
+                        y_hat, outputs = model.hybrid_rematch(inputs)
+                    else:
+                        outputs = model(inputs)
 
             if return_loss:
                 loss = loss_fn(outputs, labels)
